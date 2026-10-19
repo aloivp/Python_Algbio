@@ -1,0 +1,46 @@
+  401  mkdir -p work/{raw,results,scripts,logs}
+  402  ls -hR work
+  403  ls -lh work/raw # после помещения файлов FASTA
+  404  grep -c '^>' work/raw/genes.fasta
+  405  for f in work/raw/*.fastq.gz; do echo "$f $(( $(gzip -dc "$f" | wc -l) / 4 ))"; done
+  406  vim work/scripts/count_reads.sh
+  407  cat ./work/scripts/count_reads.sh 
+  408  chmod +x work/scripts/count_reads.sh
+  409  ./work/scripts/count_reads.sh work/raw; echo "код=$?"
+  410  command -v shellcheck parallel
+  411  shellcheck --version | head -2
+  412  parallel --version | head -1
+  413  sudo apt update && sudo apt install -y shellcheck parallel
+  414  parallel --version | head -1
+  415  shellcheck --version | head -2
+  416  nano work/scripts/count_reads_v2.sh
+  417  cat work/scripts/count_reads_v2.sh
+  418  ./work/scripts/count_reads_v2.sh work/raw 2 | tee work/results/read_counts.tsv
+  419  shellcheck work/scripts/count_reads.sh work/scripts/count_reads_v2.sh
+  420  nano work/scripts/count_reads.py
+  421  python3 work/scripts/count_reads.py work/raw 2
+  422  diff <(./work/scripts/count_reads_v2.sh work/raw 2) <(python3 work/scripts/count_reads.py work/raw 2)
+  423  wc -l work/scripts/count_reads.sh work/scripts/count_reads_v2.sh work/scripts/count_reads.py
+  424  mkdir -p /tmp/bigfq
+  425  python3 - <<'EOF'
+import gzip, random
+random.seed(1)
+pool = [''.join(random.choices('ACGT', k=100)) for _ in range(5000)]
+q = 'I' * 100
+for k in range(6):
+    with gzip.open(f'/tmp/bigfq/big{k}.fastq.gz', 'wt', compresslevel=1) as f:
+        for i in range(200000):
+            f.write(f'@r{i}\n{pool[i % 5000]}\n+\n{q}\n')
+EOF
+
+  426  ls -lh /tmp/bigfq
+  427  nproc
+  428  time ./work/scripts/count_reads.sh /tmp/bigfq > /dev/null
+  429  time ./work/scripts/count_reads_v2.sh /tmp/bigfq $(nproc) > /dev/null
+  430  time python3 work/scripts/count_reads.py /tmp/bigfq $(nproc) > /dev/null
+  431  nproc
+  432  for j in 2 6; do echo "jobs=$j"; time python3 work/scripts/count_reads.py /tmp/bigfq $j > /dev/null; done
+  433  history | tail -n 100 > work/logs/history.txt
+  434  (   TIMEFORMAT='%R';   : > work/results/timing_raw.tsv;   bench() {     local label=$1 t;     shift;     t=$( { time "$@" > /dev/null; } 2>&1 );     printf '%s\t%s\n' "$label" "$t" >> work/results/timing_raw.tsv;   };   for run in 1 2 3 4 5; do     bench "bash v1"            ./work/scripts/count_reads.sh /tmp/bigfq;     bench "bash v2, 1 поток"   ./work/scripts/count_reads_v2.sh /tmp/bigfq 1;     bench "python, 1 поток"    python3 work/scripts/count_reads.py /tmp/bigfq 1;     bench "bash v2, 8 потоков" ./work/scripts/count_reads_v2.sh /tmp/bigfq 8;     bench "python, 8 потоков"  python3 work/scripts/count_reads.py /tmp/bigfq 8;   done; )
+  435  wc -l work/results/timing_raw.tsv
+  436  history | tail -n 3 >> work/logs/history.txt
